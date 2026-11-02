@@ -52,15 +52,12 @@ final class RadioModel: ObservableObject {
     @Published var showMenuBarTitle: Bool {
         didSet { defaults.set(showMenuBarTitle, forKey: "showMenuBarTitle") }
     }
-    @Published var romanized: Bool {
+    @Published var textDisplayMode: TextDisplayMode {
         didSet {
-            defaults.set(romanized, forKey: "romanized")
+            defaults.set(textDisplayMode.rawValue, forKey: "textDisplayMode")
             updateNowPlaying()
             updateDiscordPresence()
         }
-    }
-    @Published var furigana: Bool {
-        didSet { defaults.set(furigana, forKey: "furigana") }
     }
     @Published var autoDetectOrigins: Bool {
         didSet {
@@ -89,8 +86,7 @@ final class RadioModel: ObservableObject {
         volume = UserDefaults.standard.object(forKey: "volume") as? Double ?? 0.65
         autoplay = UserDefaults.standard.bool(forKey: "autoplay")
         showMenuBarTitle = UserDefaults.standard.bool(forKey: "showMenuBarTitle")
-        romanized = UserDefaults.standard.object(forKey: "romanized") as? Bool ?? true
-        furigana = UserDefaults.standard.bool(forKey: "furigana")
+        textDisplayMode = TextDisplayMode.load(from: UserDefaults.standard)
         autoDetectOrigins = UserDefaults.standard.object(forKey: "autoDetectOrigins") as? Bool ?? true
         discordEnabled = UserDefaults.standard.bool(forKey: "discordEnabled")
         discordApplicationID = UserDefaults.standard.string(forKey: "discordApplicationID") ?? ""
@@ -100,6 +96,7 @@ final class RadioModel: ObservableObject {
         } else {
             savedTracks = []
         }
+        defaults.set(textDisplayMode.rawValue, forKey: "textDisplayMode")
         audio.volume = Float(volume)
         audio.onStateChange = { [weak self] state in
             self?.playbackState = state
@@ -121,8 +118,8 @@ final class RadioModel: ObservableObject {
         return savedTracks.contains { $0.station == station && $0.track.id == track.id }
     }
 
-    // Furigana annotates Japanese text; it must not override the metadata preference.
-    var usesRomanizedPlayerText: Bool { romanized }
+    var romanized: Bool { textDisplayMode == .romaji }
+    var furigana: Bool { textDisplayMode == .furigana }
 
     var originSummary: String { originSummary(romanized: romanized) }
 

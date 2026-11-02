@@ -20,7 +20,7 @@ struct PlayerView: View {
     @ViewState private var shelfSelection: ShelfSelection
 
     private var selectedShelf: Shelf? { shelfSelection.selected }
-    private var originSummary: String { radio.originSummary(romanized: radio.usesRomanizedPlayerText) }
+    private var originSummary: String { radio.originSummary }
 
     enum Shelf: String, CaseIterable {
         case recent = "Recently played"
@@ -125,10 +125,12 @@ struct PlayerView: View {
             ))
             Toggle("Play on launch", isOn: $radio.autoplay)
             Toggle("Song title in menu bar", isOn: $radio.showMenuBarTitle)
-            Toggle("Romanized titles & names", isOn: $radio.romanized)
-                .help("Prefers LISTEN.moe's romanized metadata, with local macOS readings when it is missing. Inferred proper-name readings may differ.")
-            Toggle("Furigana for Japanese text", isOn: $radio.furigana)
-                .help("Shows kana readings above Japanese text without overriding romanized titles & names. Turn romanization off to see original text with furigana. Proper-name readings are inferred by macOS.")
+            Picker("Text display", selection: $radio.textDisplayMode) {
+                ForEach(TextDisplayMode.allCases, id: \.self) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .help("Choose romanized titles & names, or original text with furigana above Japanese text. Missing readings are inferred by macOS; proper-name readings may differ.")
             Toggle("Identify anime / game / VN origins", isOn: $radio.autoDetectOrigins)
             Button("Discord Rich Presence…", action: radio.openDiscordSettings)
             Divider()
@@ -183,7 +185,7 @@ struct PlayerView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .top, spacing: 8) {
                 FuriganaText(
-                    radio.track?.displayTitle(romanized: radio.usesRomanizedPlayerText) ?? "Loading song info…",
+                    radio.track?.displayTitle(romanized: radio.romanized) ?? "Loading song info…",
                     enabled: radio.furigana, readingSize: 8
                 )
                     .font(.system(size: 16, weight: .bold))
@@ -204,14 +206,14 @@ struct PlayerView: View {
                 .accessibilityLabel(radio.isCurrentTrackSaved ? "Unsave song" : "Save song")
             }
             FuriganaText(
-                radio.track?.artistName(romanized: radio.usesRomanizedPlayerText) ?? radio.station.tagline,
+                radio.track?.artistName(romanized: radio.romanized) ?? radio.station.tagline,
                 enabled: radio.furigana, readingSize: 6
             )
                 .font(.system(size: 11))
                 .foregroundStyle(Palette.muted)
                 .lineLimit(2)
                 .textSelection(.enabled)
-            if let album = radio.track?.albumName(romanized: radio.usesRomanizedPlayerText) {
+            if let album = radio.track?.albumName(romanized: radio.romanized) {
                 FuriganaText(album, enabled: radio.furigana, readingSize: 6)
                     .font(.system(size: 10))
                     .foregroundStyle(Palette.muted.opacity(0.65))
@@ -457,10 +459,10 @@ struct PlayerView: View {
             .frame(width: 34, height: 34)
             .clipShape(RoundedRectangle(cornerRadius: 5))
             VStack(alignment: .leading, spacing: 3) {
-                FuriganaText(track.displayTitle(romanized: radio.usesRomanizedPlayerText), enabled: radio.furigana, readingSize: 6)
+                FuriganaText(track.displayTitle(romanized: radio.romanized), enabled: radio.furigana, readingSize: 6)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
-                FuriganaText(track.artistName(romanized: radio.usesRomanizedPlayerText), enabled: radio.furigana, readingSize: 6)
+                FuriganaText(track.artistName(romanized: radio.romanized), enabled: radio.furigana, readingSize: 6)
                     .font(.system(size: 9))
                     .foregroundStyle(Palette.muted)
                     .lineLimit(1)
