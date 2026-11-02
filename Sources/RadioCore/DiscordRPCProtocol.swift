@@ -23,7 +23,7 @@ public struct DiscordActivity: Encodable, Equatable, Sendable {
 
     public init(track: Track?, station: Station, romanized: Bool, startedAt: Date?, origin: String?, now: Date = .now) {
         details = String((track?.displayTitle(romanized: romanized) ?? "LISTEN.moe live radio").prefix(128))
-        state = String("\(track?.artistName(romanized: romanized) ?? "LISTEN.moe") · \(station.name)".prefix(128))
+        state = String("\(track?.artistName(romanized: romanized) ?? "LISTEN.moe")".prefix(128))
         if let startedAt, startedAt <= now,
            let duration = track?.duration, duration > 0,
            startedAt.addingTimeInterval(duration) > now {
@@ -33,7 +33,7 @@ public struct DiscordActivity: Encodable, Equatable, Sendable {
         }
         assets = Assets(
             large_image: track?.artworkURL?.absoluteString,
-            large_text: String((origin ?? track?.albumName(romanized: romanized) ?? "LISTEN.moe · \(station.name)").prefix(128))
+            large_text: String((origin ?? track?.albumName(romanized: romanized) ?? "LISTEN.moe").prefix(128))
         )
     }
 }
