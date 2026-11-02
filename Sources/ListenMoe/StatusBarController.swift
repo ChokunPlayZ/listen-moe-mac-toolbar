@@ -130,6 +130,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     @objc func toggleAutoplay() { radio.autoplay.toggle() }
     @objc func toggleMenuBarTitle() { radio.showMenuBarTitle.toggle() }
     @objc func toggleRomanized() { radio.romanized.toggle() }
+    @objc func toggleFurigana() { radio.furigana.toggle() }
     @objc func toggleOriginLookup() { radio.autoDetectOrigins.toggle() }
     @objc func selectStation(_ sender: NSMenuItem) {
         if let value = sender.representedObject as? String, let station = Station(rawValue: value) {
@@ -151,6 +152,7 @@ final class StatusContextMenu: NSMenu {
     private let autoplayItem = NSMenuItem(title: "Play on launch", action: #selector(StatusBarController.toggleAutoplay), keyEquivalent: "")
     private let titleItem = NSMenuItem(title: "Song title in menu bar", action: #selector(StatusBarController.toggleMenuBarTitle), keyEquivalent: "")
     private let romanizedItem = NSMenuItem(title: "Romanized titles & names", action: #selector(StatusBarController.toggleRomanized), keyEquivalent: "")
+    private let furiganaItem = NSMenuItem(title: "Furigana for Japanese text", action: #selector(StatusBarController.toggleFurigana), keyEquivalent: "")
     private let originsItem = NSMenuItem(title: "Identify anime / game / VN origins", action: #selector(StatusBarController.toggleOriginLookup), keyEquivalent: "")
     private var stationItems: [Station: NSMenuItem] = [:]
 
@@ -178,7 +180,7 @@ final class StatusContextMenu: NSMenu {
         stationItem.submenu = stations
         settings.addItem(stationItem)
         settings.addItem(.separator())
-        for item in [loginItem, autoplayItem, titleItem, romanizedItem, originsItem] {
+        for item in [loginItem, autoplayItem, titleItem, romanizedItem, furiganaItem, originsItem] {
             item.target = target
             settings.addItem(item)
         }
@@ -208,6 +210,7 @@ final class StatusContextMenu: NSMenu {
         autoplayItem.state = radio.autoplay ? .on : .off
         titleItem.state = radio.showMenuBarTitle ? .on : .off
         romanizedItem.state = radio.romanized ? .on : .off
+        furiganaItem.state = radio.furigana ? .on : .off
         originsItem.state = radio.autoDetectOrigins ? .on : .off
         for (station, item) in stationItems { item.state = radio.station == station ? .on : .off }
     }

@@ -59,6 +59,9 @@ final class RadioModel: ObservableObject {
             updateDiscordPresence()
         }
     }
+    @Published var furigana: Bool {
+        didSet { defaults.set(furigana, forKey: "furigana") }
+    }
     @Published var autoDetectOrigins: Bool {
         didSet {
             defaults.set(autoDetectOrigins, forKey: "autoDetectOrigins")
@@ -87,6 +90,7 @@ final class RadioModel: ObservableObject {
         autoplay = UserDefaults.standard.bool(forKey: "autoplay")
         showMenuBarTitle = UserDefaults.standard.bool(forKey: "showMenuBarTitle")
         romanized = UserDefaults.standard.object(forKey: "romanized") as? Bool ?? true
+        furigana = UserDefaults.standard.bool(forKey: "furigana")
         autoDetectOrigins = UserDefaults.standard.object(forKey: "autoDetectOrigins") as? Bool ?? true
         discordEnabled = UserDefaults.standard.bool(forKey: "discordEnabled")
         discordApplicationID = UserDefaults.standard.string(forKey: "discordApplicationID") ?? ""
@@ -117,7 +121,11 @@ final class RadioModel: ObservableObject {
         return savedTracks.contains { $0.station == station && $0.track.id == track.id }
     }
 
-    var originSummary: String {
+    var usesRomanizedPlayerText: Bool { romanized && !furigana }
+
+    var originSummary: String { originSummary(romanized: romanized) }
+
+    func originSummary(romanized: Bool) -> String {
         if !origins.isEmpty {
             return origins.map { "\($0.kindLabel): \($0.displayName(romanized: romanized))" }.joined(separator: " · ")
         }

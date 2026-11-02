@@ -39,6 +39,7 @@ struct StatusBarTests {
         #expect(settings?.item(withTitle: "Play on launch")?.state == (radio.autoplay ? .on : .off))
         #expect(settings?.item(withTitle: "Song title in menu bar")?.state == (radio.showMenuBarTitle ? .on : .off))
         #expect(settings?.item(withTitle: "Romanized titles & names")?.state == (radio.romanized ? .on : .off))
+        #expect(settings?.item(withTitle: "Furigana for Japanese text")?.state == (radio.furigana ? .on : .off))
         #expect(settings?.item(withTitle: "Identify anime / game / VN origins")?.state == (radio.autoDetectOrigins ? .on : .off))
     }
 
@@ -53,4 +54,24 @@ struct StatusBarTests {
         #expect(settings?.item(withTitle: "Play on launch")?.state == (radio.autoplay ? .on : .off))
     }
 
+    @Test func furiganaSettingPersistsAndTakesPrecedenceInPlayer() {
+        let radio = RadioModel.shared
+        let originalFurigana = radio.furigana
+        let originalRomanized = radio.romanized
+        defer {
+            radio.furigana = originalFurigana
+            radio.romanized = originalRomanized
+        }
+        radio.romanized = true
+        radio.furigana = true
+        #expect(!radio.usesRomanizedPlayerText)
+        #expect(UserDefaults.standard.bool(forKey: "furigana"))
+        let menu = StatusContextMenu(radio: radio, target: NSObject())
+        let settings = menu.item(withTitle: "Settings")?.submenu
+        #expect(settings?.item(withTitle: "Furigana for Japanese text")?.state == .on)
+        radio.furigana = false
+        menu.refresh()
+        #expect(radio.usesRomanizedPlayerText)
+        #expect(settings?.item(withTitle: "Furigana for Japanese text")?.state == .off)
+    }
 }

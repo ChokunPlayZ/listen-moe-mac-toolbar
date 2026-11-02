@@ -6,11 +6,11 @@ import Testing
 
 @MainActor
 struct SourceLinkViewTests {
-    @Test
-    func entireSourceRowHasAHitTarget() throws {
+    @Test(arguments: [false, true])
+    func entireSourceRowHasAHitTarget(furigana: Bool) throws {
         let destination = try #require(AniListLink.destination(for: [SongOrigin(name: "進撃の巨人")], track: nil))
         let host = NSHostingView(rootView: SourceLinkView(
-            title: "Anime: 進撃の巨人", destination: destination, attribution: "Station tag"
+            title: "Anime: 進撃の巨人", destination: destination, furigana: furigana, attribution: "Station tag"
         ).frame(width: 308))
         let window = NSWindow(
             contentRect: CGRect(origin: CGPoint(x: 200, y: 200), size: host.fittingSize),

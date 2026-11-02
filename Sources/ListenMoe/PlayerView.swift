@@ -20,7 +20,7 @@ struct PlayerView: View {
     @ViewState private var shelfSelection: ShelfSelection
 
     private var selectedShelf: Shelf? { shelfSelection.selected }
-    private var originSummary: String { radio.originSummary }
+    private var originSummary: String { radio.originSummary(romanized: radio.usesRomanizedPlayerText) }
 
     enum Shelf: String, CaseIterable {
         case recent = "Recently played"
@@ -126,6 +126,8 @@ struct PlayerView: View {
             Toggle("Play on launch", isOn: $radio.autoplay)
             Toggle("Song title in menu bar", isOn: $radio.showMenuBarTitle)
             Toggle("Romanized titles & names", isOn: $radio.romanized)
+            Toggle("Furigana for Japanese text", isOn: $radio.furigana)
+                .help("Shows kana readings above Japanese text instead of romanized names. Proper-name readings are inferred by macOS.")
             Toggle("Identify anime / game / VN origins", isOn: $radio.autoDetectOrigins)
             Button("Discord Rich Presence…", action: radio.openDiscordSettings)
             Divider()
@@ -156,7 +158,7 @@ struct PlayerView: View {
             if radio.track != nil {
                 SourceLinkView(
                     title: originSummary, destination: radio.originURL,
-                    attribution: radio.originAttribution
+                    furigana: radio.furigana, attribution: radio.originAttribution
                 )
                 .foregroundStyle(Palette.pink.opacity(0.85))
             }
@@ -179,7 +181,10 @@ struct PlayerView: View {
     private var trackDetails: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .top, spacing: 8) {
-                Text(radio.track?.displayTitle(romanized: radio.romanized) ?? "Loading song info…")
+                FuriganaText(
+                    radio.track?.displayTitle(romanized: radio.usesRomanizedPlayerText) ?? "Loading song info…",
+                    enabled: radio.furigana, readingSize: 8
+                )
                     .font(.system(size: 16, weight: .bold))
                     .lineLimit(2)
                     .textSelection(.enabled)
@@ -197,13 +202,16 @@ struct PlayerView: View {
                 .help(radio.isCurrentTrackSaved ? "Remove from saved songs" : "Save this song locally")
                 .accessibilityLabel(radio.isCurrentTrackSaved ? "Unsave song" : "Save song")
             }
-            Text(radio.track?.artistName(romanized: radio.romanized) ?? radio.station.tagline)
+            FuriganaText(
+                radio.track?.artistName(romanized: radio.usesRomanizedPlayerText) ?? radio.station.tagline,
+                enabled: radio.furigana, readingSize: 6
+            )
                 .font(.system(size: 11))
                 .foregroundStyle(Palette.muted)
                 .lineLimit(2)
                 .textSelection(.enabled)
-            if let album = radio.track?.albumName(romanized: radio.romanized) {
-                Text(album)
+            if let album = radio.track?.albumName(romanized: radio.usesRomanizedPlayerText) {
+                FuriganaText(album, enabled: radio.furigana, readingSize: 6)
                     .font(.system(size: 10))
                     .foregroundStyle(Palette.muted.opacity(0.65))
                     .lineLimit(1)
@@ -421,7 +429,8 @@ struct PlayerView: View {
 
     private var shelfHeight: CGFloat {
         let count = selectedShelf == .recent ? radio.recentTracks.count : radio.savedTracks.count
-        return count == 0 ? 44 : min(CGFloat(count) * 46 - 6, 184)
+        let rowHeight: CGFloat = radio.furigana ? 62 : 46
+        return count == 0 ? 44 : min(CGFloat(count) * rowHeight - 6, 184)
     }
 
     private func emptyShelf(_ message: String) -> some View {
@@ -447,10 +456,10 @@ struct PlayerView: View {
             .frame(width: 34, height: 34)
             .clipShape(RoundedRectangle(cornerRadius: 5))
             VStack(alignment: .leading, spacing: 3) {
-                Text(track.displayTitle(romanized: radio.romanized))
+                FuriganaText(track.displayTitle(romanized: radio.usesRomanizedPlayerText), enabled: radio.furigana, readingSize: 6)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
-                Text(track.artistName(romanized: radio.romanized))
+                FuriganaText(track.artistName(romanized: radio.usesRomanizedPlayerText), enabled: radio.furigana, readingSize: 6)
                     .font(.system(size: 9))
                     .foregroundStyle(Palette.muted)
                     .lineLimit(1)

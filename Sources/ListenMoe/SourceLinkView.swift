@@ -3,6 +3,7 @@ import SwiftUI
 struct SourceLinkView: View {
     let title: String
     let destination: URL?
+    let furigana: Bool
     let attribution: String
 
     var body: some View {
@@ -23,7 +24,7 @@ struct SourceLinkView: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "sparkles")
                 .accessibilityHidden(true)
-            Text(title)
+            FuriganaText(title, enabled: furigana)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)

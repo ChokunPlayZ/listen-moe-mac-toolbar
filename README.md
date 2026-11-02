@@ -25,6 +25,7 @@ For development, open `Package.swift` in Xcode or run `swift run ListenMoe`. Lau
 - Save songs locally with the heart; right-click saved songs to copy or remove them.
 - Open the current, recent, or saved song in Apple Music (searches its title and artists).
 - Settings for launch at login, autoplay, romanized metadata, and a menu-bar song title.
+- Optional furigana above Japanese song titles, artists, albums, and sources. Readings are generated locally by macOS; uncommon proper names may have different readings. Furigana takes precedence over romanized text in the player.
 - Remembers station, volume, settings, and saved songs between launches.
 - Independent audio/metadata reconnects with backoff and missed-heartbeat detection.
 - Resumes after system sleep only if you were already listening.
