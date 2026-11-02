@@ -15,9 +15,9 @@ struct LiveGatewayTests {
         socket.resume()
         defer { socket.cancel(with: .normalClosure, reason: nil) }
 
-        let track = try await withThrowingTaskGroup(of: Track.self) { group in
+        let update = try await withThrowingTaskGroup(of: TrackUpdate.self) { group in
             group.addTask {
-                var track: Track?
+                var trackUpdate: TrackUpdate?
                 var acknowledged = false
                 while !Task.isCancelled {
                     let frame = try await socket.receive()
@@ -31,13 +31,13 @@ struct LiveGatewayTests {
                     case .hello:
                         try await socket.send(.string("{\"op\":9}"))
                     case .trackUpdate(let update):
-                        track = update.song
+                        trackUpdate = update
                     case .heartbeatAcknowledged:
                         acknowledged = true
                     case .ignored:
                         break
                     }
-                    if let track, acknowledged { return track }
+                    if let trackUpdate, acknowledged { return trackUpdate }
                 }
                 throw ProbeError.closed
             }
@@ -52,7 +52,14 @@ struct LiveGatewayTests {
             }
             return try await group.next()!
         }
-        #expect(!track.title.isEmpty)
-        #expect(track.id > 0)
+        #expect(!update.song.title.isEmpty)
+        #expect(update.song.id > 0)
+        let start = try #require(update.startedAt)
+        let end = try #require(update.startTime)
+        let now = Date.now
+        #expect(abs(end.timeIntervalSince(start) - update.song.duration) < 0.001)
+        // Allow a little metadata/heartbeat latency at a song boundary.
+        #expect(start.timeIntervalSince(now) <= 10)
+        #expect(end.timeIntervalSince(now) >= -10)
     }
 }

@@ -303,7 +303,7 @@ final class RadioModel: ObservableObject {
         let changed = track != update.song
         track = update.song
         recentTracks = update.lastPlayed
-        startedAt = update.startTime
+        startedAt = update.startedAt
         listeners = update.listeners
         requester = update.requester?.name
         loadArtwork(update.song.artworkURL)

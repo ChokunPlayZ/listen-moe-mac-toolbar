@@ -4,8 +4,15 @@ public struct TrackUpdate: Decodable, Sendable {
     public let song: Track
     public let lastPlayed: [Track]
     public let listeners: Int?
+    // Despite the API field name, this is the scheduled end of the current song.
     public let startTime: Date?
     public let requester: Requester?
+
+    public var startedAt: Date? {
+        guard let startTime, song.duration.isFinite, song.duration > 0 else { return nil }
+        // Match the official web client's broadcast clock: startTime - duration.
+        return startTime.addingTimeInterval(-song.duration)
+    }
 
     public struct Requester: Decodable, Sendable {
         public let name: String

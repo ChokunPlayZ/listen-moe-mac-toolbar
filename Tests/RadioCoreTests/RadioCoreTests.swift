@@ -93,6 +93,34 @@ struct RadioCoreTests {
         #expect(track.artworkURL == nil)
     }
 
+    @Test func nullCreditNameDoesNotDiscardLiveTrackUpdate() throws {
+        let message = try decodeMessage("""
+        {"op":1,"t":"TRACK_UPDATE","d":{
+            "song":{"id":7780,"title":"ひび割れた鏡","duration":271},
+            "startTime":"2026-11-02T19:13:34.166Z",
+            "lastPlayed":[{"id":9950,"title":"TRINITY×SEVENTH＋HEAVEN","duration":240,
+                "sources":[{"id":719,"name":null,"nameRomaji":"Trinity Seven","image":null}]}]
+        }}
+        """)
+        guard case .trackUpdate(let update) = message else {
+            Issue.record("Expected track update")
+            return
+        }
+        #expect(update.startedAt != nil)
+        #expect(update.song.id == 7780)
+        #expect(update.lastPlayed.first?.sources.first?.name == "Trinity Seven")
+    }
+
+    @Test func unnamedCreditsRemainSafeToDisplay() throws {
+        let track = try decodeTrack("""
+        {"id":1,"title":"Test","artists":[{"id":2,"name":null}],
+         "albums":[{"id":3,"name":null}],"sources":[{"id":4,"name":null}]}
+        """)
+        #expect(track.artistName(romanized: false) == "Unknown artist")
+        #expect(track.albumName(romanized: false) == nil)
+        #expect(SongOrigin.stationSources(for: track).isEmpty)
+    }
+
     @Test func artistArtworkFallbackAndSafeFilenames() throws {
         let track = try decodeTrack("""
         {"id":1,"title":"Test","duration":-1,

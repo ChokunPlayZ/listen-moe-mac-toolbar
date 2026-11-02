@@ -6,6 +6,18 @@ public struct Credit: Codable, Equatable, Sendable {
     public let nameRomaji: String?
     public let image: String?
 
+    private enum CodingKeys: String, CodingKey { case id, name, nameRomaji, image }
+
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(Int.self, forKey: .id)
+        nameRomaji = try values.decodeIfPresent(String.self, forKey: .nameRomaji)
+        // Some live credits have only a romanized name. Optional metadata must not
+        // make the gateway discard an otherwise valid song and its timestamps.
+        name = try values.decodeIfPresent(String.self, forKey: .name) ?? nameRomaji?.nonBlank ?? ""
+        image = try values.decodeIfPresent(String.self, forKey: .image)
+    }
+
     public func displayName(romanized: Bool) -> String {
         romanized ? nameRomaji?.nonBlank ?? name : name
     }
@@ -40,12 +52,12 @@ public struct Track: Codable, Identifiable, Equatable, Sendable {
     }
 
     public func artistName(romanized: Bool) -> String {
-        let names = artists.map { $0.displayName(romanized: romanized) }
+        let names = artists.compactMap { $0.displayName(romanized: romanized).nonBlank }
         return names.isEmpty ? "Unknown artist" : names.joined(separator: ", ")
     }
 
     public func albumName(romanized: Bool) -> String? {
-        albums.first?.displayName(romanized: romanized)
+        albums.first?.displayName(romanized: romanized).nonBlank
     }
 
     public var artworkURL: URL? {

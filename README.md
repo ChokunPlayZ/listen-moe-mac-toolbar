@@ -32,6 +32,8 @@ For development, open `Package.swift` in Xcode or run `swift run ListenMoe`. Lau
 
 **Space** toggles playback while the popover is open. **⌘Q** quits. Radio is live: no skipping, seeking, or on-demand playback. Saved songs are bookmarks on this Mac, not LISTEN.moe account favorites. The progress bar follows the station's broadcast clock, not buffered audio, and may be a few seconds ahead of what you hear.
 
+Broadcast timing matches the official website: the gateway's misleadingly named `startTime` is the scheduled song end, so the actual start is `startTime - song.duration`. Reopening the player or reconnecting does not restart progress. Missing timing metadata is shown as unknown rather than replaced with a fabricated start time.
+
 ## Song origins
 
 LISTEN.moe source tags appear immediately. Automatic lookup uses exact-title matches on Wikidata to classify the tagged source. For untagged songs, it requires a matching title **and performer**, plus an explicit link from the song to a media work. Results are cached locally for 30 days; unsuccessful matches are cached for a day.
