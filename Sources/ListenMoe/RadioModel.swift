@@ -253,11 +253,14 @@ final class RadioModel: ObservableObject {
         NSWorkspace.shared.open(URL(string: "https://listen.moe")!)
     }
 
-    func openOrigin() {
-        if let url = origins.first(where: { $0.catalogURL != nil })?.catalogURL {
-            NSWorkspace.shared.open(url)
+    func openInAppleMusic(_ track: Track) {
+        let url = track.appleMusicSearchURL()
+        if !NSWorkspace.shared.open(url) {
+            NSWorkspace.shared.open(track.appleMusicSearchURL(openInApp: false))
         }
     }
+
+    var originURL: URL? { AniListLink.destination(for: origins, track: track) }
 
     func openDiscordSettings() {
         DiscordSettingsWindow.shared.show(radio: self)

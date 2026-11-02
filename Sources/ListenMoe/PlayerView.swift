@@ -154,24 +154,11 @@ struct PlayerView: View {
                 trackDetails
             }
             if radio.track != nil {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "sparkles")
-                    Text(radio.originSummary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    if radio.origins.contains(where: { $0.catalogURL != nil }) {
-                        Button(action: radio.openOrigin) {
-                            Image(systemName: "arrow.up.right.square")
-                        }
-                        .buttonStyle(.plain)
-                        .help("View source on Wikidata")
-                        .accessibilityLabel("View source on Wikidata")
-                    }
-                }
-                .font(.system(size: 10))
+                SourceLinkView(
+                    title: originSummary, destination: radio.originURL,
+                    attribution: radio.originAttribution
+                )
                 .foregroundStyle(Palette.pink.opacity(0.85))
-                .help("\(radio.originSummary)\n\(radio.originAttribution)")
             }
         }
     }
@@ -221,6 +208,16 @@ struct PlayerView: View {
                     .foregroundStyle(Palette.muted.opacity(0.65))
                     .lineLimit(1)
             }
+            Button {
+                if let track = radio.track { radio.openInAppleMusic(track) }
+            } label: {
+                Label("Open in Apple Music", systemImage: "music.note")
+                    .font(.system(size: 10))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Palette.muted)
+            .disabled(radio.track == nil)
+            .help("Search for this song and artist in Apple Music")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -396,6 +393,7 @@ struct PlayerView: View {
                                 ForEach(radio.recentTracks) { track in
                                     trackRow(track, station: radio.station)
                                         .contextMenu {
+                                            Button("Open in Apple Music") { radio.openInAppleMusic(track) }
                                             Button("Copy song & artist") { radio.copyTrack(track) }
                                         }
                                 }
@@ -406,6 +404,7 @@ struct PlayerView: View {
                             ForEach(radio.savedTracks) { saved in
                                 trackRow(saved.track, station: saved.station)
                                     .contextMenu {
+                                        Button("Open in Apple Music") { radio.openInAppleMusic(saved.track) }
                                         Button("Copy song & artist") { radio.copyTrack(saved.track) }
                                         Button("Remove saved song", role: .destructive) { radio.removeSaved(saved) }
                                     }

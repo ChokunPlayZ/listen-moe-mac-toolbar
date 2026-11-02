@@ -60,6 +60,16 @@ public struct Track: Codable, Identifiable, Equatable, Sendable {
         albums.first?.displayName(romanized: romanized).nonBlank
     }
 
+    public func appleMusicSearchURL(openInApp: Bool = true) -> URL {
+        var components = URLComponents(string: "https://music.apple.com/search")!
+        if openInApp { components.scheme = "music" }
+        let terms = ([title] + artists.map(\.name)).filter { $0.nonBlank != nil }
+        components.queryItems = [URLQueryItem(name: "term", value: terms.joined(separator: " "))]
+        // Apple treats '+' as a space in search queries, so preserve literal plus signs.
+        components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        return components.url!
+    }
+
     public var artworkURL: URL? {
         if let image = albums.compactMap(\.image).first(where: Self.isSafeFilename) {
             return URL(string: "https://cdn.listen.moe/covers/")!.appendingPathComponent(image)

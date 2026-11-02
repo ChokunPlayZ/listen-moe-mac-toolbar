@@ -23,6 +23,7 @@ For development, open `Package.swift` in Xcode or run `swift run ListenMoe`. Lau
 - Live song, artist, album artwork, broadcast progress, and recent tracks.
 - Play/pause, mute, volume, and system media-key / Now Playing support.
 - Save songs locally with the heart; right-click saved songs to copy or remove them.
+- Open the current, recent, or saved song in Apple Music (searches its title and artists).
 - Settings for launch at login, autoplay, romanized metadata, and a menu-bar song title.
 - Remembers station, volume, settings, and saved songs between launches.
 - Independent audio/metadata reconnects with backoff and missed-heartbeat detection.
@@ -38,7 +39,7 @@ Broadcast timing matches the official website: the gateway's misleadingly named 
 
 LISTEN.moe source tags appear immediately. Automatic lookup uses exact-title matches on Wikidata to classify the tagged source. For untagged songs, it requires a matching title **and performer**, plus an explicit link from the song to a media work. Results are cached locally for 30 days; unsuccessful matches are cached for a day.
 
-Not every song is catalogued. Unknown results remain unknown, and shared anime/game/VN adaptation titles are marked as ambiguous in the tooltip. **View Source on Wikidata** opens the matching record. Disable external lookup with **Identify anime / game / VN origins** in the player settings; station tags still appear.
+Not every song is catalogued. Unknown results remain unknown, and shared anime/game/VN adaptation titles are marked as ambiguous in the tooltip. Click anywhere on the source row to search **AniList**, even before automatic identification finishes. Manga and light novel sources use AniList's manga search; other sources use its anime search. If no source is known, the song title is used for a manual search; this does not claim a verified match or an adaptation. Disable external lookup with **Identify anime / game / VN origins** in the player settings; station tags still appear.
 
 ## Discord Rich Presence
 
@@ -74,6 +75,6 @@ scripts/build-app.sh    Build, icon generation, app bundling & local signing
 
 Streams use LISTEN.moe's official 128 kbps MP3 fallback endpoints because AVPlayer does not natively support the service's Ogg streams. Metadata comes from its public WebSocket gateways.
 
-Network access: `listen.moe` for radio/metadata, `cdn.listen.moe` for artwork, and `www.wikidata.org` for enabled origin lookups (song/source titles and performer names). Origin results are stored under `~/Library/Caches/ListenMoe/`. Preferences and saved songs use macOS UserDefaults. Discord integration is opt-in and sends activity to a same-user local UNIX socket; Discord then publishes it according to your privacy settings. No analytics, microphone access, or login credentials are used.
+Network access: `listen.moe` for radio/metadata, `cdn.listen.moe` for artwork, and `www.wikidata.org` for enabled origin lookups (song/source titles and performer names). AniList and Apple Music searches open only when you click their links. Origin results are stored under `~/Library/Caches/ListenMoe/`. Preferences and saved songs use macOS UserDefaults. Discord integration is opt-in and sends activity to a same-user local UNIX socket; Discord then publishes it according to your privacy settings. No analytics, microphone access, or login credentials are used.
 
 Music, artwork, and metadata belong to their respective owners. This project is not affiliated with LISTEN.moe. [Support the station](https://listen.moe/donate).
