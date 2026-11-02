@@ -1,0 +1,12 @@
+.build/
+.swiftpm/
+build/
+.DS_Store
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+.env
+.env.*
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
