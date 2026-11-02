@@ -169,11 +169,9 @@ struct PlayerView: View {
     }
 
     private var cover: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack {
             ArtworkView(image: radio.artwork, station: radio.station)
             LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
-            EqualizerView(isPlaying: radio.playbackState == .playing)
-                .padding(7)
         }
         .frame(width: 88, height: 88)
         .clipShape(RoundedRectangle(cornerRadius: 9))
@@ -533,25 +531,6 @@ private struct ArtworkView: View {
                     .foregroundStyle(.white.opacity(0.65))
                 }
             }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-private struct EqualizerView: View {
-    let isPlaying: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 0.15, paused: !isPlaying || reduceMotion)) { context in
-            HStack(alignment: .center, spacing: 3) {
-                ForEach(0..<5) { index in
-                    let phase = context.date.timeIntervalSinceReferenceDate * 5 + Double(index) * 1.8
-                    Capsule().fill(.white.opacity(0.8))
-                        .frame(width: 2, height: isPlaying ? 5 + abs(sin(phase)) * 12 : 4)
-                }
-            }
-            .frame(width: 25, height: 22)
         }
         .accessibilityHidden(true)
     }
