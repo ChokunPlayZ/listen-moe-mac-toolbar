@@ -11,9 +11,9 @@ Requires **macOS 14+** and **Swift 6+** (Xcode or Apple's Command Line Tools).
 open "build/LISTEN.moe.app"
 ```
 
-Drag `build/LISTEN.moe.app` into `/Applications` for everyday use. The radio icon appears in the **menu bar**, not the Dock. Click it, choose J-pop or K-pop, and press play. Audio is off on first launch.
+Drag `build/LISTEN.moe.app` into `/Applications` for everyday use. The radio icon appears in the **menu bar**, not the Dock. Click it and press play; choose J-pop or K-pop from **Settings → Station**. Audio is off on first launch.
 
-**Left-click** for the full player. **Right-click** (or Control-click) for artwork, song/artist/album info, source details, progress, play/pause, volume, mute, save/copy, station switching, and Quit. Each opening shows the current song, even while audio is paused.
+**Left-click** for the compact player, with artwork beside the song details and all playback controls visible without scrolling. Recent and saved song lists expand below and scroll independently. **Right-click** (or Control-click) for a minimal menu: Show Player, Settings (including station selection and Discord), the website, reconnect, and Quit.
 
 For development, open `Package.swift` in Xcode or run `swift run ListenMoe`. Launch at login requires the packaged `.app`; put it in `/Applications` before enabling it.
 
@@ -43,7 +43,7 @@ Not every song is catalogued. Unknown results remain unknown, and shared anime/g
 ## Discord Rich Presence
 
 1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications), named `LISTEN.moe`.
-2. Open **Discord Rich Presence…** from either menu. Paste the application's **Application ID**, save, and enable sharing.
+2. Open **Discord Rich Presence…** in Settings. Paste the application's **Application ID**, save, and enable sharing.
 3. Keep the Discord desktop app running and enable activity sharing in Discord's settings.
 
 The activity includes the song, artist, station, available artwork, and broadcast timestamps. Pausing or quitting clears it; reconnecting to Discord happens automatically. The application ID is public, not a token. No client secret, bot, or Discord login is needed. Discord's display depends on its activity privacy settings and client support.

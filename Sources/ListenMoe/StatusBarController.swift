@@ -30,6 +30,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.button?.action = #selector(handleClick)
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         popover.behavior = .transient
+        popover.animates = false
         contextMenu.delegate = self
         updateStatusItem()
         observation = radio.objectWillChange.sink { [weak self] _ in
@@ -66,7 +67,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         }
         button.toolTip = radio.menuBarTooltip
         button.setAccessibilityLabel(radio.menuBarTooltip)
-        button.setAccessibilityHelp("Click to open the player. Right-click for song info and controls.")
+        button.setAccessibilityHelp("Click to open the player. Right-click for settings and app actions.")
     }
 
     @objc private func handleClick() {
@@ -91,19 +92,23 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private func showPlayer() {
         guard let button = statusItem.button else { return }
         prepareForPresentation()
-        // A fresh view opens at the song info, even after scrolling through saved songs.
-        let host = NSHostingController(rootView: PlayerView(radio: radio))
-        host.sizingOptions = []
         let availableHeight = button.window?.screen?.visibleFrame.height ?? 800
+        // Only library lists scroll; the player grows to fit, within the screen.
+        let host = NSHostingController(rootView: PlayerView(
+            radio: radio, maximumHeight: availableHeight - 16
+        ) { [weak popover] size in
+            if popover?.contentSize != size { popover?.contentSize = size }
+        })
+        host.sizingOptions = []
         popover.contentViewController = host
-        popover.contentSize = NSSize(width: 356, height: min(host.view.fittingSize.height, availableHeight - 16))
+        popover.contentSize = host.view.fittingSize
         NSApp.activate()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
     }
 
     func menuWillOpen(_ menu: NSMenu) {
-        prepareForPresentation()
+        radio.refreshLoginStatus()
         contextMenu.refresh()
     }
 
@@ -118,19 +123,21 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         Task { @MainActor [weak self] in self?.showPlayer() }
     }
 
-    @objc func togglePlayback() { radio.togglePlayback() }
-    @objc func toggleMute() { radio.isMuted.toggle() }
-    @objc func toggleSave() { radio.toggleSave() }
-    @objc func copySong() {
-        if let track = radio.track { radio.copyTrack(track) }
+    @objc func toggleLaunchAtLogin() {
+        radio.setLaunchAtLogin(!radio.launchAtLogin)
+        if radio.settingsError != nil { openPlayer() }
     }
+    @objc func toggleAutoplay() { radio.autoplay.toggle() }
+    @objc func toggleMenuBarTitle() { radio.showMenuBarTitle.toggle() }
+    @objc func toggleRomanized() { radio.romanized.toggle() }
+    @objc func toggleOriginLookup() { radio.autoDetectOrigins.toggle() }
     @objc func selectStation(_ sender: NSMenuItem) {
         if let value = sender.representedObject as? String, let station = Station(rawValue: value) {
             radio.select(station)
         }
     }
     @objc func openWebsite() { radio.openWebsite() }
-    @objc func openOrigin() { radio.openOrigin() }
+    @objc func reconnectMetadata() { radio.reconnectMetadata() }
     @objc func openDiscordSettings() {
         contextMenu.cancelTracking()
         Task { @MainActor [weak self] in self?.radio.openDiscordSettings() }
@@ -140,11 +147,11 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 @MainActor
 final class StatusContextMenu: NSMenu {
     private let radio: RadioModel
-    private let playbackItem = NSMenuItem(title: "Play Radio", action: #selector(StatusBarController.togglePlayback), keyEquivalent: " ")
-    private let muteItem = NSMenuItem(title: "Mute", action: #selector(StatusBarController.toggleMute), keyEquivalent: "")
-    private let saveItem = NSMenuItem(title: "Save Current Song", action: #selector(StatusBarController.toggleSave), keyEquivalent: "")
-    private let copyItem = NSMenuItem(title: "Copy Song & Artist", action: #selector(StatusBarController.copySong), keyEquivalent: "")
-    private let originItem = NSMenuItem(title: "View Source on Wikidata", action: #selector(StatusBarController.openOrigin), keyEquivalent: "")
+    private let loginItem = NSMenuItem(title: "Launch at login", action: #selector(StatusBarController.toggleLaunchAtLogin), keyEquivalent: "")
+    private let autoplayItem = NSMenuItem(title: "Play on launch", action: #selector(StatusBarController.toggleAutoplay), keyEquivalent: "")
+    private let titleItem = NSMenuItem(title: "Song title in menu bar", action: #selector(StatusBarController.toggleMenuBarTitle), keyEquivalent: "")
+    private let romanizedItem = NSMenuItem(title: "Romanized titles & names", action: #selector(StatusBarController.toggleRomanized), keyEquivalent: "")
+    private let originsItem = NSMenuItem(title: "Identify anime / game / VN origins", action: #selector(StatusBarController.toggleOriginLookup), keyEquivalent: "")
     private var stationItems: [Station: NSMenuItem] = [:]
 
     init(radio: RadioModel, target: AnyObject) {
@@ -152,31 +159,12 @@ final class StatusContextMenu: NSMenu {
         super.init(title: "LISTEN.moe")
         autoenablesItems = false
 
-        let header = NSMenuItem()
-        let headerView = NSHostingView(rootView: NowPlayingMenuView(radio: radio))
-        headerView.frame = NSRect(origin: .zero, size: headerView.fittingSize)
-        header.view = headerView
-        header.isEnabled = false
-        addItem(header)
-        let controlsItem = NSMenuItem()
-        let controlsView = NSHostingView(rootView: MenuPlaybackView(radio: radio, openPlayer: { [weak target] in
-            (target as? StatusBarController)?.openPlayer()
-        }))
-        controlsView.frame = NSRect(origin: .zero, size: controlsView.fittingSize)
-        controlsItem.view = controlsView
-        addItem(controlsItem)
-        let volumeItem = NSMenuItem()
-        let volumeView = NSHostingView(rootView: MenuVolumeView(radio: radio))
-        volumeView.frame = NSRect(origin: .zero, size: volumeView.fittingSize)
-        volumeItem.view = volumeView
-        addItem(volumeItem)
-        addItem(.separator())
         let showPlayer = NSMenuItem(title: "Show Player", action: #selector(StatusBarController.openPlayer), keyEquivalent: "")
         addItem(showPlayer)
-        playbackItem.keyEquivalentModifierMask = []
-        for item in [playbackItem, muteItem, saveItem, copyItem, originItem] { addItem(item) }
         addItem(.separator())
 
+        let settings = NSMenu(title: "Settings")
+        settings.autoenablesItems = false
         let stations = NSMenu(title: "Station")
         stations.autoenablesItems = false
         for station in Station.allCases {
@@ -188,9 +176,21 @@ final class StatusContextMenu: NSMenu {
         }
         let stationItem = NSMenuItem(title: "Station", action: nil, keyEquivalent: "")
         stationItem.submenu = stations
-        addItem(stationItem)
+        settings.addItem(stationItem)
+        settings.addItem(.separator())
+        for item in [loginItem, autoplayItem, titleItem, romanizedItem, originsItem] {
+            item.target = target
+            settings.addItem(item)
+        }
+        settings.addItem(.separator())
+        let discordItem = NSMenuItem(title: "Discord Rich Presence…", action: #selector(StatusBarController.openDiscordSettings), keyEquivalent: "")
+        discordItem.target = target
+        settings.addItem(discordItem)
+        let settingsItem = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+        settingsItem.submenu = settings
+        addItem(settingsItem)
         addItem(NSMenuItem(title: "Visit LISTEN.moe", action: #selector(StatusBarController.openWebsite), keyEquivalent: ""))
-        addItem(NSMenuItem(title: "Discord Rich Presence…", action: #selector(StatusBarController.openDiscordSettings), keyEquivalent: ""))
+        addItem(NSMenuItem(title: "Reconnect song info", action: #selector(StatusBarController.reconnectMetadata), keyEquivalent: ""))
         addItem(.separator())
         let quit = NSMenuItem(title: "Quit LISTEN.moe", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         for item in items where item.action != nil { item.target = target }
@@ -204,12 +204,11 @@ final class StatusContextMenu: NSMenu {
     }
 
     func refresh() {
-        playbackItem.title = radio.playbackState.isActive ? "Pause Radio" : "Play Radio"
-        muteItem.state = radio.isMuted ? .on : .off
-        saveItem.isEnabled = radio.track != nil
-        saveItem.state = radio.isCurrentTrackSaved ? .on : .off
-        copyItem.isEnabled = radio.track != nil
-        originItem.isEnabled = radio.origins.contains { $0.catalogURL != nil }
+        loginItem.state = radio.launchAtLogin ? .on : .off
+        autoplayItem.state = radio.autoplay ? .on : .off
+        titleItem.state = radio.showMenuBarTitle ? .on : .off
+        romanizedItem.state = radio.romanized ? .on : .off
+        originsItem.state = radio.autoDetectOrigins ? .on : .off
         for (station, item) in stationItems { item.state = radio.station == station ? .on : .off }
     }
 }

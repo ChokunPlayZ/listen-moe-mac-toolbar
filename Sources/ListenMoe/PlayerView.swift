@@ -15,35 +15,71 @@ private enum Palette {
 
 struct PlayerView: View {
     @ObservedObject var radio: RadioModel
-    @ViewState private var selectedShelf: Shelf?
+    let maximumHeight: CGFloat
+    private let onSizeChange: (CGSize) -> Void
+    @ViewState private var shelfSelection: ShelfSelection
 
-    private enum Shelf: String, CaseIterable {
+    private var selectedShelf: Shelf? { shelfSelection.selected }
+    private var originSummary: String { radio.originSummary }
+
+    enum Shelf: String, CaseIterable {
         case recent = "Recently played"
         case saved = "Saved songs"
+    }
+
+    struct ShelfSelection {
+        private(set) var selected: Shelf?
+        private var lastOpened: Shelf
+
+        init(selected: Shelf? = nil) {
+            self.selected = selected
+            lastOpened = selected ?? .recent
+        }
+
+        mutating func toggle(_ shelf: Shelf) {
+            lastOpened = shelf
+            selected = selected == shelf ? nil : shelf
+        }
+
+        mutating func toggleExpansion() {
+            selected = selected == nil ? lastOpened : nil
+        }
+    }
+
+    init(
+        radio: RadioModel, maximumHeight: CGFloat = 720, initialShelf: Shelf? = nil,
+        onSizeChange: @escaping (CGSize) -> Void = { _ in }
+    ) {
+        self.radio = radio
+        self.maximumHeight = maximumHeight
+        self.onSizeChange = onSizeChange
+        _shelfSelection = ViewState(initialValue: ShelfSelection(selected: initialShelf))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             header
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    stationPicker
-                    cover
-                    trackDetails
-                    progress
-                    playbackControls
-                    volumeControl
-                    connectionNotice
-                    library
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
+            VStack(spacing: 16) {
+                nowPlaying
+                progress
+                playbackControls
+                volumeControl
+                connectionNotice
             }
-            .frame(maxHeight: 680)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 18)
+            .fixedSize(horizontal: false, vertical: true)
+            library
+                .padding(.horizontal, 24)
             footer
         }
         .frame(width: 356)
+        .frame(maxHeight: maximumHeight, alignment: .top)
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { onSizeChange($0) }
+        // AppKit resizes the popover after SwiftUI lays out its new content.
+        // Keep the player at the top during that handoff instead of centering it.
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(Palette.background)
         .foregroundStyle(.white)
         .tint(Palette.pink)
@@ -70,12 +106,20 @@ struct PlayerView: View {
             settingsMenu
         }
         .padding(.horizontal, 24)
-        .padding(.top, 22)
-        .padding(.bottom, 22)
+        .padding(.top, 18)
+        .padding(.bottom, 18)
     }
 
     private var settingsMenu: some View {
         Menu {
+            Picker("Station", selection: Binding(
+                get: { radio.station }, set: { radio.select($0) }
+            )) {
+                ForEach(Station.allCases) { station in
+                    Text(station.name).tag(station)
+                }
+            }
+            Divider()
             Toggle("Launch at login", isOn: Binding(
                 get: { radio.launchAtLogin }, set: { radio.setLaunchAtLogin($0) }
             ))
@@ -103,119 +147,82 @@ struct PlayerView: View {
         .accessibilityLabel("Settings")
     }
 
-    private var stationPicker: some View {
-        HStack(spacing: 4) {
-            ForEach(Station.allCases) { station in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { radio.select(station) }
-                } label: {
-                    HStack(spacing: 7) {
-                        Text(station == .jpop ? "JP" : "KR")
-                            .font(.system(size: 8, weight: .bold, design: .monospaced))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 3)
-                            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 3))
-                        Text(station.name)
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 34)
-                    .foregroundStyle(radio.station == station ? .white : Palette.muted)
-                    .background {
-                        if radio.station == station {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(.white.opacity(0.085))
-                                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Palette.line))
+    private var nowPlaying: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 14) {
+                cover
+                trackDetails
+            }
+            if radio.track != nil {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "sparkles")
+                    Text(radio.originSummary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    if radio.origins.contains(where: { $0.catalogURL != nil }) {
+                        Button(action: radio.openOrigin) {
+                            Image(systemName: "arrow.up.right.square")
                         }
+                        .buttonStyle(.plain)
+                        .help("View source on Wikidata")
+                        .accessibilityLabel("View source on Wikidata")
                     }
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(station.name) station")
-                .accessibilityAddTraits(radio.station == station ? .isSelected : [])
+                .font(.system(size: 10))
+                .foregroundStyle(Palette.pink.opacity(0.85))
+                .help("\(radio.originSummary)\n\(radio.originAttribution)")
             }
         }
-        .padding(4)
-        .background(.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 11))
     }
 
     private var cover: some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack(alignment: .bottomTrailing) {
             ArtworkView(image: radio.artwork, station: radio.station)
             LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .center, endPoint: .bottom)
-            HStack {
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(radio.connectionState == .connected ? Palette.pink : Palette.muted)
-                        .frame(width: 5, height: 5)
-                    Text(radio.connectionState == .connected ? "LIVE RADIO" : "TUNING IN")
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .tracking(1.3)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(.black.opacity(0.45), in: Capsule())
-                Spacer()
-                EqualizerView(isPlaying: radio.playbackState == .playing)
-            }
-            .padding(14)
+            EqualizerView(isPlaying: radio.playbackState == .playing)
+                .padding(7)
         }
-        .frame(height: 224)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.08)))
+        .frame(width: 88, height: 88)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(.white.opacity(0.08)))
         .accessibilityLabel("\(radio.station.name) album artwork")
     }
 
     private var trackDetails: some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .top, spacing: 8) {
                 Text(radio.track?.displayTitle(romanized: radio.romanized) ?? "Loading song info…")
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .lineLimit(2)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(radio.track?.artistName(romanized: radio.romanized) ?? radio.station.tagline)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Palette.muted)
-                    .lineLimit(2)
-                    .textSelection(.enabled)
-                if let album = radio.track?.albumName(romanized: radio.romanized) {
-                    Text(album)
-                        .font(.system(size: 10))
-                        .foregroundStyle(Palette.muted.opacity(0.65))
-                        .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(action: radio.toggleSave) {
+                    Image(systemName: radio.isCurrentTrackSaved ? "heart.fill" : "heart")
+                        .font(.system(size: 14))
+                        .foregroundStyle(radio.isCurrentTrackSaved ? Palette.pink : Palette.muted)
+                        .frame(width: 22, height: 20)
+                        .contentShape(Rectangle())
                 }
-                if radio.track != nil {
-                    HStack(alignment: .top, spacing: 5) {
-                        Image(systemName: "sparkles")
-                        Text(radio.originSummary)
-                            .lineLimit(3)
-                    }
+                .buttonStyle(.plain)
+                .disabled(radio.track == nil)
+                .help(radio.isCurrentTrackSaved ? "Remove from saved songs" : "Save this song locally")
+                .accessibilityLabel(radio.isCurrentTrackSaved ? "Unsave song" : "Save song")
+            }
+            Text(radio.track?.artistName(romanized: radio.romanized) ?? radio.station.tagline)
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.muted)
+                .lineLimit(2)
+                .textSelection(.enabled)
+            if let album = radio.track?.albumName(romanized: radio.romanized) {
+                Text(album)
                     .font(.system(size: 10))
-                    .foregroundStyle(Palette.pink.opacity(0.85))
-                    .padding(.top, 4)
-                    .help(radio.originAttribution)
-                    if radio.origins.contains(where: { $0.catalogURL != nil }) {
-                        Button("View source ↗", action: radio.openOrigin)
-                            .font(.system(size: 9))
-                            .buttonStyle(.plain)
-                            .foregroundStyle(Palette.muted)
-                    }
-                }
+                    .foregroundStyle(Palette.muted.opacity(0.65))
+                    .lineLimit(1)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Button(action: radio.toggleSave) {
-                Image(systemName: radio.isCurrentTrackSaved ? "heart.fill" : "heart")
-                    .font(.system(size: 17))
-                    .foregroundStyle(radio.isCurrentTrackSaved ? Palette.pink : Palette.muted)
-                    .frame(width: 30, height: 32)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(radio.track == nil)
-            .help(radio.isCurrentTrackSaved ? "Remove from saved songs" : "Save this song locally")
-            .accessibilityLabel(radio.isCurrentTrackSaved ? "Unsave song" : "Save song")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var progress: some View {
@@ -235,8 +242,6 @@ struct PlayerView: View {
                 .frame(height: 3)
                 HStack {
                     Text(radio.startedAt == nil ? "—:——" : RadioTimeline.timestamp(elapsed))
-                    Spacer()
-                    Text("LIVE · NO SKIPS").tracking(1)
                     Spacer()
                     Text(duration > 0 ? RadioTimeline.timestamp(duration) : "—:——")
                 }
@@ -294,8 +299,10 @@ struct PlayerView: View {
             Text(radio.statusText)
                 .font(.system(size: 10))
                 .foregroundStyle(Palette.muted)
+                .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+                .help(radio.statusText)
         }
     }
 
@@ -347,9 +354,8 @@ struct PlayerView: View {
             HStack(spacing: 16) {
                 ForEach(Shelf.allCases, id: \.self) { shelf in
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedShelf = selectedShelf == shelf ? nil : shelf
-                        }
+                        // Do not animate SwiftUI layout and the AppKit popover size separately.
+                        shelfSelection.toggle(shelf)
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: shelf == .recent ? "clock.arrow.circlepath" : "heart")
@@ -366,39 +372,57 @@ struct PlayerView: View {
                     .accessibilityAddTraits(selectedShelf == shelf ? .isSelected : [])
                 }
                 Spacer(minLength: 0)
-                Image(systemName: selectedShelf == nil ? "chevron.down" : "chevron.up")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(Palette.muted)
-                    .accessibilityHidden(true)
+                Button {
+                    shelfSelection.toggleExpansion()
+                } label: {
+                    Image(systemName: selectedShelf == nil ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Palette.muted)
+                        .frame(width: 24, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(selectedShelf == nil ? "Expand song list" : "Collapse song list")
+                .accessibilityLabel(selectedShelf == nil ? "Expand song list" : "Collapse song list")
             }
+            .fixedSize(horizontal: false, vertical: true)
             if let selectedShelf {
-                VStack(spacing: 12) {
-                    if selectedShelf == .recent {
-                        if radio.recentTracks.isEmpty {
-                            emptyShelf("No recent songs.")
+                ScrollView {
+                    VStack(spacing: 12) {
+                        if selectedShelf == .recent {
+                            if radio.recentTracks.isEmpty {
+                                emptyShelf("No recent songs.")
+                            } else {
+                                ForEach(radio.recentTracks) { track in
+                                    trackRow(track, station: radio.station)
+                                        .contextMenu {
+                                            Button("Copy song & artist") { radio.copyTrack(track) }
+                                        }
+                                }
+                            }
+                        } else if radio.savedTracks.isEmpty {
+                            emptyShelf("No saved songs.")
                         } else {
-                            ForEach(radio.recentTracks) { track in
-                                trackRow(track, station: radio.station)
+                            ForEach(radio.savedTracks) { saved in
+                                trackRow(saved.track, station: saved.station)
                                     .contextMenu {
-                                        Button("Copy song & artist") { radio.copyTrack(track) }
+                                        Button("Copy song & artist") { radio.copyTrack(saved.track) }
+                                        Button("Remove saved song", role: .destructive) { radio.removeSaved(saved) }
                                     }
                             }
                         }
-                    } else if radio.savedTracks.isEmpty {
-                        emptyShelf("No saved songs.")
-                    } else {
-                        ForEach(radio.savedTracks) { saved in
-                            trackRow(saved.track, station: saved.station)
-                                .contextMenu {
-                                    Button("Copy song & artist") { radio.copyTrack(saved.track) }
-                                    Button("Remove saved song", role: .destructive) { radio.removeSaved(saved) }
-                                }
-                        }
                     }
+                    .padding(.bottom, 6)
                 }
-                .padding(.bottom, 6)
+                .frame(minHeight: 0, idealHeight: shelfHeight, maxHeight: shelfHeight)
+                .layoutPriority(-1)
             }
         }
+    }
+
+    private var shelfHeight: CGFloat {
+        let count = selectedShelf == .recent ? radio.recentTracks.count : radio.savedTracks.count
+        return count == 0 ? 44 : min(CGFloat(count) * 46 - 6, 184)
     }
 
     private func emptyShelf(_ message: String) -> some View {
