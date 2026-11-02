@@ -19,7 +19,7 @@ public struct Credit: Codable, Equatable, Sendable {
     }
 
     public func displayName(romanized: Bool) -> String {
-        romanized ? nameRomaji?.nonBlank ?? name : name
+        romanized ? nameRomaji?.nonBlank ?? Romanization.fallback(for: name) : name
     }
 }
 
@@ -48,7 +48,7 @@ public struct Track: Codable, Identifiable, Equatable, Sendable {
     }
 
     public func displayTitle(romanized: Bool) -> String {
-        romanized ? titleRomaji?.nonBlank ?? title : title
+        romanized ? titleRomaji?.nonBlank ?? Romanization.fallback(for: title) : title
     }
 
     public func artistName(romanized: Bool) -> String {

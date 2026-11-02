@@ -31,7 +31,7 @@ public struct SongOrigin: Codable, Equatable, Identifiable, Sendable {
     }
 
     public func displayName(romanized: Bool) -> String {
-        romanized ? nameRomaji?.nonBlank ?? name : name
+        romanized ? nameRomaji?.nonBlank ?? Romanization.fallback(for: name) : name
     }
 
     public var kindLabel: String {

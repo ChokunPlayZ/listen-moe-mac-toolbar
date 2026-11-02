@@ -54,7 +54,7 @@ struct StatusBarTests {
         #expect(settings?.item(withTitle: "Play on launch")?.state == (radio.autoplay ? .on : .off))
     }
 
-    @Test func furiganaSettingPersistsAndTakesPrecedenceInPlayer() {
+    @Test func furiganaSettingPersistsWithoutOverridingRomanization() {
         let radio = RadioModel.shared
         let originalFurigana = radio.furigana
         let originalRomanized = radio.romanized
@@ -64,7 +64,7 @@ struct StatusBarTests {
         }
         radio.romanized = true
         radio.furigana = true
-        #expect(!radio.usesRomanizedPlayerText)
+        #expect(radio.usesRomanizedPlayerText)
         #expect(UserDefaults.standard.bool(forKey: "furigana"))
         let menu = StatusContextMenu(radio: radio, target: NSObject())
         let settings = menu.item(withTitle: "Settings")?.submenu
@@ -73,5 +73,33 @@ struct StatusBarTests {
         menu.refresh()
         #expect(radio.usesRomanizedPlayerText)
         #expect(settings?.item(withTitle: "Furigana for Japanese text")?.state == .off)
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func playerMetadataRespectsRomanization(romanized: Bool, furigana: Bool) throws {
+        let radio = RadioModel.shared
+        let originalRomanized = radio.romanized
+        let originalFurigana = radio.furigana
+        defer {
+            radio.romanized = originalRomanized
+            radio.furigana = originalFurigana
+        }
+        radio.romanized = romanized
+        radio.furigana = furigana
+        let track = try JSONDecoder().decode(Track.self, from: Data(#"""
+        {"id":1,"title":"赤いリボン","titleRomaji":"Akai Ribbon",
+         "artists":[{"id":2,"name":"小倉唯","nameRomaji":"Yui Ogura"}],
+         "albums":[{"id":3,"name":"東京物語","nameRomaji":"Tokyo Monogatari"}],
+         "sources":[{"id":4,"name":"進撃の巨人","nameRomaji":"Shingeki no Kyojin"}]}
+        """#.utf8))
+        #expect(radio.usesRomanizedPlayerText == romanized)
+        #expect(track.displayTitle(romanized: radio.usesRomanizedPlayerText) == (romanized ? "Akai Ribbon" : "赤いリボン"))
+        #expect(track.artistName(romanized: radio.usesRomanizedPlayerText) == (romanized ? "Yui Ogura" : "小倉唯"))
+        #expect(track.albumName(romanized: radio.usesRomanizedPlayerText) == (romanized ? "Tokyo Monogatari" : "東京物語"))
+        #expect(track.sources.first?.displayName(romanized: radio.usesRomanizedPlayerText) == (romanized ? "Shingeki no Kyojin" : "進撃の巨人"))
+        let missingRomaji = try JSONDecoder().decode(Track.self, from: Data(
+            #"{"id":5,"title":"赤いリボン","titleRomaji":null}"#.utf8
+        ))
+        #expect(missingRomaji.displayTitle(romanized: radio.usesRomanizedPlayerText) == (romanized ? "akai ribon" : "赤いリボン"))
     }
 }

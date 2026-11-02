@@ -121,7 +121,8 @@ final class RadioModel: ObservableObject {
         return savedTracks.contains { $0.station == station && $0.track.id == track.id }
     }
 
-    var usesRomanizedPlayerText: Bool { romanized && !furigana }
+    // Furigana annotates Japanese text; it must not override the metadata preference.
+    var usesRomanizedPlayerText: Bool { romanized }
 
     var originSummary: String { originSummary(romanized: romanized) }
 
