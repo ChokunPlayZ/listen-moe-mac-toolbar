@@ -19,4 +19,24 @@ struct DiscordPresenceTests {
         #expect(host.fittingSize.width == 440)
         #expect(host.fittingSize.height < 600)
     }
+
+    @Test func settingsWindowIsOnlyCreatedOnDemandAndIsNotRestored() throws {
+        let application = NSApplication.shared
+        let existingWindows = application.windows
+        let settings = DiscordSettingsWindow()
+        #expect(application.windows == existingWindows)
+
+        settings.show(radio: RadioModel.shared)
+        let window = try #require(application.windows.first {
+            $0.title == "Discord Rich Presence" && !existingWindows.contains($0)
+        })
+        defer { window.close() }
+        #expect(window.isVisible)
+        #expect(!window.isRestorable)
+
+        window.close()
+        #expect(!window.isVisible)
+        settings.show(radio: RadioModel.shared)
+        #expect(window.isVisible)
+    }
 }

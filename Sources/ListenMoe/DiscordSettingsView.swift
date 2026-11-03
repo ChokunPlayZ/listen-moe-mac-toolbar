@@ -60,6 +60,7 @@ final class DiscordSettingsWindow {
             window.title = "Discord Rich Presence"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
+            window.isRestorable = false
             window.center()
             self.window = window
         }
