@@ -5,6 +5,46 @@ import RadioCore
 struct LiveGatewayTests {
     enum ProbeError: Error { case timeout, closed }
 
+    @MainActor
+    @Test(
+        .enabled(if: ProcessInfo.processInfo.environment["LISTEN_MOE_LIVE_TESTS"] == "1"),
+        arguments: Station.allCases
+    )
+    func appGatewayRefreshesImmediatelyAfterReconnect(station: Station) async throws {
+        let gateway = RadioGateway()
+        let (events, continuation) = AsyncStream.makeStream(of: TrackUpdate.self)
+        gateway.onUpdate = { continuation.yield($0) }
+        defer {
+            gateway.disconnect()
+            continuation.finish()
+        }
+        gateway.connect(to: station)
+        let first = try await nextSnapshot(in: events)
+        gateway.disconnect()
+        gateway.connect(to: station)
+        let refreshed = try await nextSnapshot(in: events)
+        #expect(!refreshed.song.title.isEmpty)
+        #expect(try #require(refreshed.startTime).timeIntervalSinceNow >= -15)
+        if first.song.id == refreshed.song.id {
+            #expect(first.startedAt == refreshed.startedAt)
+        }
+    }
+
+    private func nextSnapshot(in events: AsyncStream<TrackUpdate>) async throws -> TrackUpdate {
+        try await withThrowingTaskGroup(of: TrackUpdate.self) { group in
+            group.addTask {
+                for await update in events { return update }
+                throw ProbeError.closed
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(15))
+                throw ProbeError.timeout
+            }
+            defer { group.cancelAll() }
+            return try await group.next()!
+        }
+    }
+
     // Opt in explicitly: normal tests are deterministic and work without a network.
     @Test(
         .enabled(if: ProcessInfo.processInfo.environment["LISTEN_MOE_LIVE_TESTS"] == "1"),

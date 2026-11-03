@@ -68,8 +68,8 @@ final class RadioModel: ObservableObject {
 
     enum OriginLookupState { case idle, searching, complete, unavailable }
 
-    private let defaults = UserDefaults.standard
-    private let gateway = RadioGateway()
+    private let defaults: UserDefaults
+    private let gateway: RadioGateway
     private let audio = AudioPlayer()
     private let discord = DiscordPresence()
     private let originResolver = SongOriginResolver()
@@ -77,20 +77,23 @@ final class RadioModel: ObservableObject {
     private var artworkTask: Task<Void, Never>?
     private var artworkURL: URL?
     private var hasStarted = false
+    private var isSleeping = false
     private var resumeOnWake = false
     private var workspaceObservers: [any NSObjectProtocol] = []
     private var remoteTargets: [(MPRemoteCommand, Any)] = []
 
-    private init() {
-        station = Station(rawValue: UserDefaults.standard.string(forKey: "station") ?? "") ?? .jpop
-        volume = UserDefaults.standard.object(forKey: "volume") as? Double ?? 0.65
-        autoplay = UserDefaults.standard.bool(forKey: "autoplay")
-        showMenuBarTitle = UserDefaults.standard.bool(forKey: "showMenuBarTitle")
-        textDisplayMode = TextDisplayMode.load(from: UserDefaults.standard)
-        autoDetectOrigins = UserDefaults.standard.object(forKey: "autoDetectOrigins") as? Bool ?? true
-        discordEnabled = UserDefaults.standard.bool(forKey: "discordEnabled")
-        discordApplicationID = UserDefaults.standard.string(forKey: "discordApplicationID") ?? ""
-        if let data = UserDefaults.standard.data(forKey: "savedTracks"),
+    init(defaults: UserDefaults = .standard, gateway: RadioGateway = RadioGateway()) {
+        self.defaults = defaults
+        self.gateway = gateway
+        station = Station(rawValue: defaults.string(forKey: "station") ?? "") ?? .jpop
+        volume = defaults.object(forKey: "volume") as? Double ?? 0.65
+        autoplay = defaults.bool(forKey: "autoplay")
+        showMenuBarTitle = defaults.bool(forKey: "showMenuBarTitle")
+        textDisplayMode = TextDisplayMode.load(from: defaults)
+        autoDetectOrigins = defaults.object(forKey: "autoDetectOrigins") as? Bool ?? true
+        discordEnabled = defaults.bool(forKey: "discordEnabled")
+        discordApplicationID = defaults.string(forKey: "discordApplicationID") ?? ""
+        if let data = defaults.data(forKey: "savedTracks"),
            let saved = try? JSONDecoder().decode([SavedTrack].self, from: data) {
             savedTracks = saved
         } else {
@@ -104,7 +107,11 @@ final class RadioModel: ObservableObject {
             self?.updateDiscordPresence()
         }
         discord.onStateChange = { [weak self] state in self?.discordState = state }
-        gateway.onStateChange = { [weak self] state in self?.connectionState = state }
+        gateway.onStateChange = { [weak self] state in
+            guard let self else { return }
+            self.connectionState = state
+            if state != .connected { self.clearMetadata() }
+        }
         gateway.onUpdate = { [weak self] update in self?.receive(update) }
     }
 
@@ -162,24 +169,30 @@ final class RadioModel: ObservableObject {
         workspaceObservers.append(center.addObserver(
             forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.resumeOnWake = self.playbackState.isActive
-                self.audio.stop()
-                self.gateway.disconnect()
-            }
+            MainActor.assumeIsolated { self?.prepareForSleep() }
         })
         workspaceObservers.append(center.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.gateway.connect(to: self.station)
-                if self.resumeOnWake { self.play() }
-                self.resumeOnWake = false
-            }
+            MainActor.assumeIsolated { self?.resumeAfterSleep() }
         })
         if autoplay { play() }
+    }
+
+    func prepareForSleep() {
+        guard !isSleeping else { return }
+        isSleeping = true
+        resumeOnWake = playbackState.isActive
+        audio.stop()
+        gateway.disconnect()
+    }
+
+    func resumeAfterSleep() {
+        guard isSleeping else { return }
+        isSleeping = false
+        gateway.connect(to: station)
+        if resumeOnWake { play() }
+        resumeOnWake = false
     }
 
     func shutdown() {
@@ -202,20 +215,27 @@ final class RadioModel: ObservableObject {
         audio.stop()
         self.station = station
         defaults.set(station.rawValue, forKey: "station")
+        clearMetadata()
+        gateway.connect(to: station)
+        if wasPlaying { play() }
+    }
+
+    private func clearMetadata() {
         track = nil
         recentTracks = []
         startedAt = nil
         listeners = nil
         requester = nil
         artworkTask?.cancel()
+        artworkTask = nil
         artworkURL = nil
         artwork = nil
         originTask?.cancel()
+        originTask = nil
         origins = []
         originLookupState = .idle
-        gateway.connect(to: station)
         updateNowPlaying()
-        if wasPlaying { play() }
+        updateDiscordPresence()
     }
 
     func togglePlayback() {

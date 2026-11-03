@@ -111,6 +111,69 @@ struct RadioCoreTests {
         #expect(update.lastPlayed.first?.sources.first?.name == "Trinity Seven")
     }
 
+    @Test(arguments: [
+        (#"{"username":"listener","displayName":"A Listener"}"#, "A Listener"),
+        (#"{"username":"listener","displayName":null}"#, "listener"),
+        (#"{"username":"listener","displayName":"  "}"#, "listener"),
+        (#"{"name":"legacy-listener"}"#, "legacy-listener"),
+        (#"{"username":"listener","displayName":42}"#, "listener"),
+    ])
+    func requesterFormatsDoNotDiscardCurrentSong(json: String, expectedName: String) throws {
+        let message = try decodeMessage("""
+        {"op":1,"t":"TRACK_UPDATE","d":{
+            "song":{"id":42,"title":"Requested song","duration":120},
+            "startTime":"2026-11-02T18:03:23.521Z","requester":\(json)
+        }}
+        """)
+        guard case .trackUpdate(let update) = message else {
+            Issue.record("Expected current-song snapshot")
+            return
+        }
+        #expect(update.song.id == 42)
+        #expect(update.startedAt != nil)
+        #expect(update.requester?.name == expectedName)
+    }
+
+    @Test(arguments: ["null", "{}", #"{"name":null}"#, #"{"displayName":" "}"#, "42", "[]"])
+    func unusableRequesterDoesNotDiscardCurrentSong(requester: String) throws {
+        let message = try decodeMessage("""
+        {"op":1,"t":"TRACK_UPDATE_REQUEST","d":{
+            "song":{"id":42,"title":"Still playing"},"requester":\(requester)
+        }}
+        """)
+        guard case .trackUpdate(let update) = message else {
+            Issue.record("Expected current-song snapshot")
+            return
+        }
+        #expect(update.song.id == 42)
+        #expect(update.requester == nil)
+    }
+
+    @Test func malformedHistoryDoesNotDiscardCurrentSongOrValidHistory() throws {
+        let message = try decodeMessage("""
+        {"op":1,"t":"TRACK_UPDATE","d":{
+            "song":{"id":42,"title":"Current song","duration":120},
+            "startTime":"2026-11-02T18:03:23.521Z","listeners":{},
+            "lastPlayed":[null,{"id":1},{"id":2,"title":"Valid recent song"},17,
+                {"id":3,"title":"Broken credits","artists":[null]}]
+        }}
+        """)
+        guard case .trackUpdate(let update) = message else {
+            Issue.record("Expected current-song snapshot")
+            return
+        }
+        #expect(update.song.id == 42)
+        #expect(update.startedAt != nil)
+        #expect(update.lastPlayed.map(\.id) == [2])
+        #expect(update.listeners == nil)
+    }
+
+    @Test func requiredSongStillMustBeValid() {
+        #expect(throws: DecodingError.self) {
+            try decodeMessage(#"{"op":1,"t":"TRACK_UPDATE","d":{"song":{"id":42}}}"#)
+        }
+    }
+
     @Test func unnamedCreditsRemainSafeToDisplay() throws {
         let track = try decodeTrack("""
         {"id":1,"title":"Test","artists":[{"id":2,"name":null}],

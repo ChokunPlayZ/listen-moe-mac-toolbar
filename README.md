@@ -28,14 +28,16 @@ For development, open `Package.swift` in Xcode or run `swift run ListenMoe`. Lau
 - Romanized text prefers LISTEN.moe's supplied metadata. When it is missing, Japanese and Korean readings are generated locally by macOS; inferred proper-name readings may differ from the official spelling. Original metadata is preserved.
 - Furigana mode keeps original text and adds kana readings above Japanese song titles, artists, albums, and sources instead of romanizing them. Readings are generated locally by macOS; uncommon proper names may have different readings.
 - Remembers station, volume, settings, and saved songs between launches.
-- Independent audio/metadata reconnects with backoff and missed-heartbeat detection.
-- Resumes after system sleep only if you were already listening.
+- Independent audio/metadata reconnects with backoff, missed-heartbeat detection, and stale-song recovery.
+- Refreshes the current song after system sleep without waiting for a song change; resumes audio only if you were already listening.
 - Automatic anime, game, visual novel, and other media source identification.
 - Optional Discord Rich Presence through the local Discord desktop client.
 
 **Space** toggles playback while the popover is open. **⌘Q** quits. Radio is live: no skipping, seeking, or on-demand playback. Saved songs are bookmarks on this Mac, not LISTEN.moe account favorites. The progress bar follows the station's broadcast clock, not buffered audio, and may be a few seconds ahead of what you hear.
 
 Broadcast timing matches the official website: the gateway's misleadingly named `startTime` is the scheduled song end, so the actual start is `startTime - song.duration`. Reopening the player or reconnecting does not restart progress. Missing timing metadata is shown as unknown rather than replaced with a fabricated start time.
+
+Song info is cleared when its connection is interrupted rather than presenting the previous song as current. A connection is considered ready only after a usable current-song snapshot arrives. Missing snapshots and songs that remain unchanged past their scheduled end (plus a short transition allowance) trigger a fresh metadata connection, even if heartbeats still succeed. Malformed optional requester or recent-song details do not discard the current song.
 
 ## Song origins
 

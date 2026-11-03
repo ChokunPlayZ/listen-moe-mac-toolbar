@@ -16,6 +16,17 @@ public struct TrackUpdate: Decodable, Sendable {
 
     public struct Requester: Decodable, Sendable {
         public let name: String
+
+        private enum CodingKeys: String, CodingKey { case name, username, displayName }
+
+        public init(from decoder: any Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            // Current gateways use displayName/username; older payloads use name.
+            name = (try? values.decode(String.self, forKey: .displayName))?.nonBlank
+                ?? (try? values.decode(String.self, forKey: .username))?.nonBlank
+                ?? (try? values.decode(String.self, forKey: .name))?.nonBlank
+                ?? ""
+        }
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -25,10 +36,19 @@ public struct TrackUpdate: Decodable, Sendable {
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         song = try values.decode(Track.self, forKey: .song)
-        lastPlayed = try values.decodeIfPresent([Track].self, forKey: .lastPlayed) ?? []
-        listeners = try values.decodeIfPresent(Int.self, forKey: .listeners)
-        requester = try values.decodeIfPresent(Requester.self, forKey: .requester)
-        if let timestamp = try values.decodeIfPresent(String.self, forKey: .startTime) {
+        // Auxiliary data must never prevent the current song from refreshing.
+        var history: [Track] = []
+        if var entries = try? values.nestedUnkeyedContainer(forKey: .lastPlayed) {
+            while !entries.isAtEnd {
+                let entry = try entries.superDecoder()
+                if let track = try? Track(from: entry) { history.append(track) }
+            }
+        }
+        lastPlayed = history
+        listeners = try? values.decode(Int.self, forKey: .listeners)
+        let decodedRequester = try? values.decode(Requester.self, forKey: .requester)
+        requester = decodedRequester?.name.nonBlank == nil ? nil : decodedRequester
+        if let timestamp = try? values.decode(String.self, forKey: .startTime) {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             startTime = formatter.date(from: timestamp)
